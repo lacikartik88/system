@@ -1,21 +1,23 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Version=Beta
-#AutoIt3Wrapper_Icon=bin\s_main.ico
+#AutoIt3Wrapper_Icon=bin\s-main.ico
 #AutoIt3Wrapper_Outfile=system.x86.exe
 #AutoIt3Wrapper_Outfile_x64=system.x64.exe
 #AutoIt3Wrapper_Compression=0
 #AutoIt3Wrapper_Compile_Both=y
 #AutoIt3Wrapper_UseX64=y
-#AutoIt3Wrapper_Res_Comment=SYSTEM - Categorized Portable Software Loader created by AutoIt3
-#AutoIt3Wrapper_Res_Description=SYSTEM   v2.4.5.5   Enterprise Edition
-#AutoIt3Wrapper_Res_Fileversion=2.4.5.5
+#AutoIt3Wrapper_Res_Comment=System control panel and tools for system engineers, created by AutoIt3
+#AutoIt3Wrapper_Res_Description=SYSTEM   v2.4.07.30   Ultimate Edition
+#AutoIt3Wrapper_Res_Fileversion=2.4.7.30
 #AutoIt3Wrapper_Res_ProductName=SYSTEM
-#AutoIt3Wrapper_Res_ProductVersion=2.4.5.5
+#AutoIt3Wrapper_Res_ProductVersion=2.4.07.30
 #AutoIt3Wrapper_Res_CompanyName=László Kártik - Senior IT System Engineer
-#AutoIt3Wrapper_Res_LegalCopyright=Copyright © 2020, László Kártik
+#AutoIt3Wrapper_Res_LegalCopyright=Copyright © 2024, László Kártik
+#AutoIt3Wrapper_Res_LegalTradeMarks=SYSTEM ™ SINCE 2019
 #AutoIt3Wrapper_Res_Language=1038
+#AutoIt3Wrapper_Res_requestedExecutionLevel=requireAdministrator
 #AutoIt3Wrapper_Res_Field=Website|"https://github.com/lacikartik88"
-#AutoIt3Wrapper_Res_Field=Comment|"Categorized Portable Software Loader created by AutoIt3"
+#AutoIt3Wrapper_Res_Field=Comment|"System control panel and tools for system engineers, created by AutoIt3"
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 ; Info: http://www.autoitscript.com/autoit3/scite/docs/AutoIt3Wrapper.htm
@@ -39,101 +41,158 @@
 #include <GUIMenu.au3>
 #include <IE.au3>
 #include <ListViewConstants.au3>
-#include <MsgBoxConstants.au3>
+#include <Process.au3>
 #include <StaticConstants.au3>
 #include <WinAPI.au3>
+#include <WinAPISys.au3>
+#include <WinAPIsysinfoConstants.au3>
 #include <WindowsConstants.au3>
 
 Init()
 
 Func Init()
 	; define laod screen gui
-	Global $iGUI
-	$iGUI = GUICreate("", 320, 60, -1, -1, $WS_POPUP, -1)
-	GUISetFont(8, $FW_MEDIUM, "", "Comic Sans Ms", $iGUI, $CLEARTYPE_QUALITY)
-	;WinSetTrans($iGUI, "", 250)
+	Global $initGUI
+	$initGUI = GUICreate("", 320, 60, -1, -1, $WS_POPUP, -1)
+	GUISetFont(8, $FW_MEDIUM, "", "Comic Sans Ms", $initGUI, $CLEARTYPE_QUALITY)
+	;WinSetTrans($initGUI, "", 250)
 	GUISetBkColor(0x2D2D2D)
-	GUICtrlSetDefColor(0xFFFFFF, $iGUI)
-	GUICtrlSetDefBkColor(0x2D2D2D, $iGUI)
-
+	GUICtrlSetDefColor(0xFFFFFF, $initGUI)
+	GUICtrlSetDefBkColor(0x2D2D2D, $initGUI)
 
 	; show gui, define progress
-	GUISetState(@SW_SHOW, $iGUI)
+	GUISetState(@SW_SHOW, $initGUI)
 	$iProgress = GUICtrlCreateProgress(10, 10, 300, 25, -1, -1)
 
 	; *** step 1: define variables
 	GUICtrlCreateLabel("Define variables...                               ", 10, 35, -1, -1)
 	GUICtrlSetData($iProgress, "10")
-	Sleep(50)
+	Sleep(10)
 
 	; define main gui vars
-	Global $mGUI
-	Global $CatD[16], $NameD[256], $AppF[256] ; read directories, files and write data to $cfg, create menu system
-	Global $i = 0, $j = 0, $k = 0, $l = 0, $m = 0, $n = 0 ; sequence variables
-	Global $icon, $back, $bExit, $Btn ; theme variables
+	Global $mainGUI, $icon, $back, $iExit, $iCAT, $iCP, $iS, $iPS, $iCMD, $iAdd, $iRem, $bExit, $bCAT, $bCP, $bS, $bPS, $bCMD, $bAdd, $bRem ; theme variables
+	Global $rCategory[16], $rName[256], $rExecutable[256], $rRun[256] ; create menu system
+	Global $i = 0, $j = 0, $k = 0, $l = 0, $m = 0, $n = 0, $p = 0, $q = 0; sequence variables
+	Global $aCategory[16] = ["BOOT", "DEV", "EDUCATION", "FILE_MANAGE", "MEDIA_AUDIO", "MEDIA_PICTURE", "MEDIA_VIDEO", "NETWORK", "OFFICE", "SECURITY", "UTILITY"] ; for category folder creation
+	Global $aInfo, $aInfoDAT[32], $aInfoDB[32] = ["Host Name", "OS Name", "OS Version", "OS Manufacturer", "OS Configuration", "OS Build Type", "System Boot Time", _
+	"System Manufacturer", "System Model", "System Type", "BIOS Version", "Processor(s)", "Boot Device", "Page File Location(s)", "System Locale", _
+	"Time Zone", "Domain", "Logon Server", "Hotfix(s)", "Total Physical Memory", "Available Physical Memory", "Drive Space Total", "Drive Space Used", "Drive Space Free", _
+	"Drive Space Used In Percent", "Drive Space Free In Percent", "IP Address 1", "IP Address 2", "IP Address 3", "IP Address 4"] ; system informations for reading, writing and gui
+	Global $dLabel, $dProgress, $dPercent, $dTotal, $dFree ; disk space variables
+	Global $7z ; package management - majd később
+	Global $AddGUI, $RemGUI, $bOK, $bCA, $bBR, $cPathOr, $cPathMo, $cCat, $cNameOr, $cNameMo, $cFod ; add or remove application
 
 	; set directories
 	Global $appD = @ScriptDir & "\apps" ; applications directory
+	Global $binD = @ScriptDir & "\bin" ; binaries directory
+	Global $trashD = @ScriptDir & "\trash" ; trash directory
+	; define configurations files
+	Global $cfg = $binD & "\config.ini" ; setup application main config file
+	Global $info = $binD & "\sysinfo.ini" ; system information config file
+	Global $7z = $binD & "\7z.exe" ; package
 
-	; define cfg file
-	Global $cfg = @ScriptDir & "\bin\config.ini" ; setup application main config file
-
-	; *** step 2: setting up themes
-	GUICtrlCreateLabel("Setting up themes...                              ", 10, 35, -1, -1)
-	GUICtrlSetData($iProgress, "20")
-	Sleep(50)
-
-	; define theme variables
-	Global $icon = @ScriptDir & "\bin\s_main.ico"
-	Global $back = @ScriptDir & "\bin\s_back.bmp" ; 1000x400
-	Global $back = @ScriptDir & "\bin\s_matrix.mp4" ; -1, -1, 1000, 400 if 1080p resolution video file
-	Global $bExit = @ScriptDir & "\bin\s_exit.ico"
-
-	; *** step 4: create head
-	GUICtrlCreateLabel("Createing head...                                 ", 10, 35, -1, -1)
-	GUICtrlSetData($iProgress, "40")
-	Sleep(50)
+	; delete old menu system from $cfg
+	IniDelete($cfg, "SYSTEM")
+	IniDelete($cfg, "Info")
+	IniDelete($cfg, "Categories")
+	IniDelete($cfg, "Applications")
+	IniDelete($cfg, "rCategory")
+	IniDelete($cfg, "rName")
+	IniDelete($cfg, "rExecutable")
+	IniDelete($cfg, "rShellExecute")
 
 	; define head
-	Global $sysName = "SYSTEM    v2.4.05.05    Enterprise Edition"
+	Global $sysName, $n, $v, $e
+	$n = "SYSTEM"
+	$v = "v2.4.07.30"
+	$e = "Ultimate Edition   (developer: Kártik László - Senior IT System Engineer)"
+	$sysName = $n & "    " & $v & "    " & $e
+	BinaryToString(IniWrite($cfg, $n, "Name", $n), $SB_ANSI)
+	BinaryToString(IniWrite($cfg, $n, "Version", $v), $SB_ANSI)
+	BinaryToString(IniWrite($cfg, $n, "Edition", $e), $SB_ANSI)
+
+	; *** step 2: discover envinroments
+	GUICtrlCreateLabel("Discover envinroments...                          ", 10, 35, -1, -1)
+	GUICtrlSetData($iProgress, "20")
+	Sleep(1)
+
+	; run systeminfo in cmd
+	SysInfo()
+
+	; *** step 3: write data to info file
+	GUICtrlCreateLabel("Writing data to files...                          ", 10, 35, -1, -1)
+	GUICtrlSetData($iProgress, "30")
+	Sleep(1)
+
+	InfoWrite()
+
+	; *** step 4: setting up themes
+	GUICtrlCreateLabel("Setting up theme files...                         ", 10, 35, -1, -1)
+	GUICtrlSetData($iProgress, "40")
+	Sleep(10)
+
+	; define theme variables
+	Global $icon = $binD & "\s-main.ico"
+	Global $back = $binD & "\s-back.jpg" ; 1200 x 600
+	Global $back2 = $binD & "\s-matrix.mp4" ; -1, -1, 1200, 600 if 1080p resolution video file
+	Global $iExit = $binD & "\s-exit.ico"
+	Global $iCAT = $binD & "\s-cat.ico"
+	Global $iCP = $binD & "\s-control.ico"
+	Global $iS = $binD & "\s-settings.ico"
+	Global $iPS = $binD & "\s-powershell.ico"
+	Global $iCMD = $binD & "\s-cmd.ico"
+	Global $iAdd = $binD & "\s-add.ico"
+	Global $iRem = $binD & "\s-remove.ico"
 
 	; *** step 5: creating menu structure
 	GUICtrlCreateLabel("Creating menu structure...                        ", 10, 35, -1, -1)
-	GUICtrlSetData($iProgress, "50")
-	Sleep(100)
+	GUICtrlSetData($iProgress, "60")
+	Sleep(20)
 
-	; delete old menu system
-	IniDelete($cfg, "CatD")
-	IniDelete($cfg, "NameD")
-	IniDelete($cfg, "AppF")
-	IniDelete($cfg, "ShellExecute")
+	; generating data
+	ScanFolders()
+	GenData()
 
+	; *** step 6: done
+	GUICtrlCreateLabel("Done...                                           ", 10, 35, -1, -1)
+	GUICtrlSetData($iProgress, "100")
+	; wait 0.10s
+	Sleep(10)
+
+	; delete gui and run main gui
+	GUIDelete($initGUI)
+	Main()
+EndFunc		;==>Init
+
+Func GenData()
 	; generate data
+	_ArrayDelete($rCategory, 16) ; reset array
 	Global $i = "", $j = 0, $k = "", $l = 0, $m = "", $n = 0 ; sequence variables
 	Global $o = 0, $p = 0, $q = 0 ; sequence variables
-	Global $r = 10, $s = 0 ; localize combo position
-	; $i = value of $CatD | $k = value of $NameD | $m = value of $AppF
+	; $i = value of $rCategory | $k = value of $rName | $m = value of $rExecutable
 	; $j, $l, $n, $o, $p, $q = counters
-	$CatD = _FileListToArray($appD, "*", $FLTA_FOLDERS, False)
-	For $i In $CatD
+	$rCategory = _FileListToArray($appD, "*", $FLTA_FOLDERS, False)
+	For $i In $rCategory
 		If IsString($i) Then
-			; IniWrite($cfg, "CatD", $j, $i)
-			$NameD = _FileListToArray($appD & "\" & $i, "*", $FLTA_FOLDERS, False)
+			; IniWrite($cfg, "rCategory", $j, $i)
+			$rName = _FileListToArray($appD & "\" & $i, "*", $FLTA_FOLDERS, False)
 			$j += 1
-			If IsArray($NameD) Then
-				For $k In $NameD
+			If IsArray($rName) Then
+				For $k In $rName
 					If IsString($k) Then
 						; IniWrite($cfg, $i, $l, $k)
-						$AppF = _FileListToArray($appD & "\" & $i & "\" & $k, "*.exe", $FLTA_FILES, False)
+						$rExecutable = _FileListToArray($appD & "\" & $i & "\" & $k, "*.exe", $FLTA_FILES, False)
 						$l += 1
-						If IsArray($AppF) Then
-							For $m In $AppF
+						If IsArray($rExecutable) Then
+							For $m In $rExecutable
 								If IsString($m) Then
 									; IniWrite($cfg, $k, $n, $m)
-									BinaryToString(IniWrite($cfg, "CatD", "$CatD[" & $o & "]", "GUICtrlCreateMenu(" & '"' & $i & '"' & ")"), $SB_ANSI)
-									BinaryToString(IniWrite($cfg, "NameD", "$NameD[" & $p & "]", "GUICtrlCreateMenu(" & '"' & $k & '"' & ", $CatD[" & $o & "])"), $SB_ANSI)
-									BinaryToString(IniWrite($cfg, "AppF", "$AppF[" & $q & "]", "GUICtrlCreateMenuItem(" & '"' & $m & '"' & ", $NameD[" & $p & "])"), $SB_ANSI)
-									BinaryToString(IniWrite($cfg, "ShellExecute", $q, $appD & "\" & $i & "\" & $k & "\" & $m), $SB_ANSI)
+									BinaryToString(IniWrite($cfg, "Categories", $o, $i), $SB_ANSI)
+									BinaryToString(IniWrite($cfg, "Applications", $p, $i & "\" & $k), $SB_ANSI)
+									BinaryToString(IniWrite($cfg, "rCategory", "$rCategory[" & $o & "]", "GUICtrlCreateMenu(" & '"' & $i & '"' & ")"), $SB_ANSI)
+									BinaryToString(IniWrite($cfg, "rName", "$rName[" & $p & "]", "GUICtrlCreateMenu(" & '"' & $k & '"' & ", $rCategory[" & $o & "])"), $SB_ANSI)
+									BinaryToString(IniWrite($cfg, "rExecutable", "$rExecutable[" & $q & "]", "GUICtrlCreateMenuItem(" & '"' & $m & '"' & ", $rName[" & $p & "])"), $SB_ANSI)
+									BinaryToString(IniWrite($cfg, "rShellExecute", $q, $appD & "\" & $i & "\" & $k & "\" & $m), $SB_ANSI)
 									$n += 1
 									$q += 1
 								Else
@@ -141,7 +200,6 @@ Func Init()
 							Next
 							$n = 0
 							$p += 1
-							$r = $r + 220
 						Else
 						EndIf
 					Else
@@ -154,21 +212,229 @@ Func Init()
 		Else
 		EndIf
 	Next
+	Global $i = 0 ; sequence variables
+	For $i = 0 To 255 Step 1
+		$rRun[$i] = BinaryToString(IniRead($cfg, "rShellExecute", $i, ""), $SB_ANSI)
+	Next
+EndFunc		;==>GenData
 
-	; *** step 6: done
-	GUICtrlCreateLabel("Done...                                           ", 10, 35, -1, -1)
-	GUICtrlSetData($iProgress, "100")
-	; wait 0.50s
-	Sleep(50)
+Func ScanFolders()
+	; generate data
+	Global $i = 0 ; sequence variables
 
-	; delete gui and run main gui
-	GUIDelete($iGUI)
-	mGUI()
-EndFunc   ;==>Init
+	; reading to variables
+	For $i = 0 To 15 Step 1
+		If BinaryToString(IniRead($cfg, "Categories", $i, ""), $SB_ANSI) <> "" Then $aCategory[$i] = BinaryToString(IniRead($cfg, "Categories", $i, ""), $SB_ANSI)
+	Next
+	Global $i = 0 ; reset sequence variables
 
-Func MP()
-	$oMP = ObjCreate("WMPlayer.OCX")
-	GUICtrlCreateObj($oMP, -1, -1, 1000, 400)
+	; check folders and create
+	For $i = 0 To 15 Step 1
+		If FileExists($appD & "\" & $aCategory[$i]) = False Then DirCreate($appD & "\" & $aCategory[$i])
+	Next
+	Global $i = 0 ; reset sequence variables
+EndFunc		;==>ScanFolders
+
+Func SysInfo()
+	; querry informations of machine and write to file
+	FileDelete($info)
+	_RunDos("systeminfo /s \\" & @ComputerName & " /fo list > " & $info)
+EndFunc		;==>SysInfo
+
+Func InfoWrite()
+	; generate data
+	Global $i = 0 ; sequence variables
+
+	; reading and converting information from $info
+	$aInfo = BinaryToString(FileRead($info), $SB_ANSI)
+	$aInfo = StringStripWS($aInfo, $STR_STRIPSPACES)
+	$aInfo = StringReplace($aInfo, ": ", "=")
+	$aInfo = StringReplace($aInfo, "˙", "")
+	$aInfo = StringReplace($aInfo, ".,", ",")
+	$aInfo = StringReplace($aInfo, "Physical Memory ", "Physical Memory=")
+	$aInfo = StringReplace($aInfo, "Virtual Memory=", "Virtual Memory ")
+	$aInfo = StringReplace($aInfo, "Installed." & @CR & "[01]=", "Installed: ")
+	$aInfo = StringReplace($aInfo, @CR & "[02]=", ", ")
+	$aInfo = StringReplace($aInfo, @CR & "[03]=", ", ")
+	$aInfo = StringReplace($aInfo, @CR & "[04]=", ", ")
+	$aInfo = StringReplace($aInfo, @CR & "[05]=", ", ")
+	$aInfo = StringLeft($aInfo, StringInStr($aInfo, "Network Card(s)") - 1)
+	If StringInStr($aInfo, "[06]") = True Then $aInfo = StringLeft($aInfo, StringInStr($aInfo, "[06]") - 1)
+	$aInfo = StringReplace($aInfo, "displayed." & @CR, "displayed.")
+	$dTotal = DriveSpaceTotal(@ScriptDir)
+	$dFree = DriveSpaceFree(@ScriptDir)
+	$dPercent = $dFree / $dTotal * 100
+	$dPercent = 100 - $dPercent
+
+	; writing information to $info
+	FileOpen($info, $FO_OVERWRITE)
+	BinaryToString(FileWrite($info, "[systeminfo]" & @CR & $aInfo), $SB_ANSI)
+	BinaryToString(FileWrite($info, "Drive Space Total=" & StringFormat("%.1f", ($dTotal / 1024)) & " GB" & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "Drive Space Used=" & StringFormat("%.1f", (($dTotal - $dFree) / 1024)) & " GB" & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "Drive Space Free=" & StringFormat("%.1f", ($dFree / 1024)) & " GB" & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "Drive Space Used In Percent=" & StringFormat("%.1f", $dPercent) & " %" & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "Drive Space Free In Percent=" & StringFormat("%.1f", ("100" - $dPercent)) & " %" & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "IP Address 1=" & @IPAddress1 & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "IP Address 2=" & @IPAddress2 & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "IP Address 3=" & @IPAddress3 & @CR), $SB_ANSI)
+	BinaryToString(FileWrite($info, "IP Address 4=" & @IPAddress4 & @CR), $SB_ANSI)
+	FileClose($info)
+
+	; read $info file to variables
+	For $i = 0 To 29 Step 1
+		$aInfoDAT[$i] = BinaryToString(IniRead($info, "systeminfo", $aInfoDB[$i], ""), $SB_ANSI)
+	Next
+	Global $i = 0 ; reset sequence variables
+
+	; write variables to $cfg
+	For $i = 0 To 29 Step 1
+		BinaryToString(IniWrite($cfg, "Info", $aInfoDB[$i], $aInfoDAT[$i]), $SB_ANSI)
+	Next
+	Global $i = 0 ; reset sequence variables
+EndFunc		;==>InfoWrite
+
+Func InfoDisplay()
+	; generate data
+	Global $i = 0 ; sequence variables
+	Global $n = 10, $o = 20, $p = 150, $q = 20 ; sequence variables
+
+	; create info bars
+	GUICtrlCreateGroup("", 5, 5, 580, 535)
+	GUICtrlCreateGroup("", 590, 5, 440, 535)
+
+	If StringLen($aInfoDAT[18]) = 100 Then
+		StringReplace($aInfoDAT[18], StringLeft($aInfoDAT[18], 100), @CR)
+	EndIf
+
+	; create labels 1st row
+	For $i = 0 To 25 Step 1
+		GUICtrlSetBkColor(GUICtrlCreateLabel($aInfoDB[$i], $n, $o), $GUI_BKCOLOR_TRANSPARENT)
+		GUICtrlSetBkColor(GUICtrlCreateLabel($aInfoDAT[$i], $p, $q), $GUI_BKCOLOR_TRANSPARENT)
+		$o += 20
+		$q += 20
+	Next
+	Global $i = 0 ; reset sequence variables
+	Global $n = 600, $o = 20, $p = 710, $q = 20 ; reset sequence variables
+
+	; create labels 2nd row
+	For $i = 26 To 29 Step 1
+		GUICtrlSetBkColor(GUICtrlCreateLabel($aInfoDB[$i], $n, $o), $GUI_BKCOLOR_TRANSPARENT)
+		GUICtrlSetBkColor(GUICtrlCreateLabel($aInfoDAT[$i], $p, $q), $GUI_BKCOLOR_TRANSPARENT)
+		$o += 20
+		$q += 20
+	Next
+	Global $i = 0 ; reset sequence variables
+	Global $n = 0, $o = 0, $p = 0, $q = 0 ; reset sequence variables
+
+	; create free disk space bar
+	GUICtrlCreateGroup("", 5, 540, 1190, 34)
+	$dLabel = GUICtrlCreateLabel("Free disk space: ", 10, 552, -1, 16)
+	GUICtrlSetBkColor($dLabel, $GUI_BKCOLOR_TRANSPARENT)
+	$dProgress = GUICtrlCreateProgress(100, 555, 1090, 10, -1, -1)
+	GUICtrlSetData($dProgress, $dPercent)
+EndFunc		;==>InfoDisplay
+
+Func ButtonDisplay()
+	; create button group
+	GUICtrlCreateGroup("", 1035, 5, 160, 535)
+
+	; Control Admintools button
+	$bCAT = GUICtrlCreateButton("  " & "Felügyeleti eszközök", 1040, 25, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bCAT, $iCAT, "", 2)
+	GUICtrlSetCursor($bCAT, 0)
+	GUICtrlSetStyle($bCAT, $BS_LEFT)
+
+	; Control Panel button
+	$bCP = GUICtrlCreateButton("  " & "Vezérlőpult", 1040, 85, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bCP, $iCP, "", 2)
+	GUICtrlSetCursor($bCP, 0)
+	GUICtrlSetStyle($bCP, $BS_LEFT)
+
+	; Settings button
+	$bS = GUICtrlCreateButton("  " & "Gépház", 1040, 145, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bS, $iS, "", 2)
+	GUICtrlSetCursor($bS, 0)
+	GUICtrlSetStyle($bS, $BS_LEFT)
+
+	; PowerShell button
+	$bPS = GUICtrlCreateButton("  " & "PowerShell", 1040, 205, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bPS, $iPS, "", 2)
+	GUICtrlSetCursor($bPS, 0)
+	GUICtrlSetStyle($bPS, $BS_LEFT)
+
+	; CMD button
+	$bCMD = GUICtrlCreateButton("  " & "CMD", 1040, 265, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bCMD, $iCMD, "", 2)
+	GUICtrlSetCursor($bCMD, 0)
+	GUICtrlSetStyle($bCMD, $BS_LEFT)
+
+	; Add program
+	$bAdd = GUICtrlCreateButton("  " & "Alkalmazás hozzáadása", 1040, 325, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bAdd, $iAdd, "", 2)
+	GUICtrlSetCursor($bAdd, 0)
+	GUICtrlSetStyle($bAdd, $BS_LEFT)
+	GUICtrlSetTip($bAdd, "A program újraindításával jár!")
+
+	; Remove program
+	$bRem = GUICtrlCreateButton("  " & "Alkalmazás törlése", 1040, 385, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bRem, $iRem, "", 2)
+	GUICtrlSetCursor($bRem, 0)
+	GUICtrlSetStyle($bRem, $BS_LEFT)
+	GUICtrlSetTip($bRem, "A program újraindításával jár!")
+
+	; Exit button
+	$bExit = GUICtrlCreateButton("  " & "Kilépés", 1040, 475, 150, 50, $BS_ICON)
+	GUICtrlSetImage($bExit, $iExit, "", 2)
+	GUICtrlSetCursor($bExit, 0)
+	GUICtrlSetStyle($bExit, $BS_LEFT)
+EndFunc		;==>ButtonDisplay
+
+Func MenuDisplay()
+	; generating data for menu
+	Global $rCategory[16], $rName[256], $rExecutable[256] ; reset variables for create menu system
+	Global $i = 0, $j = 0, $k = 0, $l = 0, $m = 0, $n = 0 ; sequence variables
+
+	; reading menu category data from $cfg - menu
+	For $i = 0 To 15 Step 1
+		If IniRead($cfg, "rCategory", "$rCategory[" & $i & "]", "") <> "" Then
+			$rCategory[$i] = IniRead($cfg, "rCategory", "$rCategory[" & $i & "]", "")
+			$rCategory[$i] = BinaryToString($rCategory[$i], $SB_ANSI)
+			; create menu
+			If $rCategory[$i] <> "" Then $rCategory[$i] = Execute($rCategory[$i])
+		Else
+		EndIf
+	Next
+
+	; reading menu program name data from $cfg - menuitem
+	For $j = 0 To 225 Step 1
+		If IniRead($cfg, "rName", "$rName[" & $j & "]", "") <> "" Then
+			$rName[$j] = IniRead($cfg, "rName", "$rName[" & $j & "]", "")
+			$rName[$j] = BinaryToString($rName[$j], $SB_ANSI)
+			; create menuitems
+			If $rName[$j] <> "" Then $rName[$j] = Execute($rName[$j])
+		Else
+		EndIf
+	Next
+
+	; reading menu program path data from $cfg - submenuitem
+	For $k = 0 To 255 Step 1
+		If IniRead($cfg, "rExecutable", "$rExecutable[" & $k & "]", "") <> "" Then
+			$rExecutable[$k] = IniRead($cfg, "rExecutable", "$rExecutable[" & $k & "]", "")
+			$rExecutable[$k] = BinaryToString($rExecutable[$k], $SB_ANSI)
+			; create submenuitems
+			If $rExecutable[$k] <> "" Then $rExecutable[$k] = Execute($rExecutable[$k])
+		Else
+		EndIf
+	Next
+EndFunc		;==>MenuDisplay
+
+Func PickDisplay()
+	GUICtrlCreatePic($back, 0, 0, 1200, 600, $BS_BITMAP) ; create background from iamge
+EndFunc		;==>PickDisplay
+
+Func VideoDisplay()
+	$oMP = ObjCreate("WMPlayer.OCX") ; create background from video
+	GUICtrlCreateObj($oMP, -1, -1, 1200, 600)
 	With $oMP
 		.FullScreen = True
 		.WindowlessVideo = True
@@ -181,594 +447,727 @@ Func MP()
 		.Settings.Volume = 0 ; 0 - 100
 		.Settings.Balance = 0 ; -100 to 100
 		.Settings.Repeat = True
-		.URL = $back ; $back is an existing file
+		.URL = $back2 ; $back2 is an existing file
 	EndWith
-EndFunc
+EndFunc		;==>VideoDisplay
 
-Func mGUI()
+Func AddBR()
+	$cFod = FileSelectFolder("Alkalmazás hozzáadása", "", "", @ScriptDir, $AddGUI)
+	GUICtrlSetData($cPathOr, $cFod)
+EndFunc		;==>AddBR
+
+Func AddApp()
+	; read data
+	$cPathOr = GUICtrlRead($cPathOr)
+	$cCat = GUICtrlRead($cCat)
+	$cPathMo = $cPathOr
+
+	; modulate data
+	For $i = 0 To 256 Step 1
+		If StringInStr($cPathMo, "\") = True Then $cPathMo = StringTrimLeft($cPathMo, StringInStr($cPathMo, "\"))
+	Next
+	Global $i = 0 ; reset sequence variables
+
+	; run dos
+	_RunDos("MD " & $appD & "\"  & $cCat & "\" & $cPathMo & '"')
+	_RunDos("XCOPY " & '"' & $cPathOr & '"' & " " & '"' & $appD & "\" & $cCat & "\" & $cPathMo & '"')
+
+	; error check
+	if @error Then
+		MsgBox(16, "Error", "Alkalmazást nem sikerült hozzáadni!" & @CRLF & "A program újraindul!", 1, $RemGUI)
+	Else
+		MsgBox(64, "Info", "Alkalmazást sikerült hozzáadni!" & @CRLF & "A program újraindul!", 1, $RemGUI)
+	EndIf
+EndFunc		;==>AddApp
+
+Func AddAppGUI()
+	$AddGUI = GUICreate("Alkalmazás hozzáadása a menühöz", 600, 100, -1, -1, -1, -1, 0)
+	GUISetFont(8, $FW_MEDIUM, "", "Comic Sans Ms", $AddGUI, $CLEARTYPE_QUALITY)
+	GUISetBkColor(0x2D2D2D)
+	GUICtrlSetDefColor(0xFFFFFF, $AddGUI)
+	GUICtrlSetDefBkColor(0x2D2D2D, $AddGUI)
+
+	; create controls
+	GUICtrlCreateGroup("", 5, 5, 590, 90)
+	GUICtrlSetBkColor(GUICtrlCreateLabel("Alkalmazás útvonala: ", 15, 15), $GUI_BKCOLOR_TRANSPARENT)
+	$cPathOr = GUICtrlCreateInput("", 200, 15, 290, 20)
+	GUICtrlSetBkColor(GUICtrlCreateLabel("Hozzáadás kategóriához: ", 15, 50), $GUI_BKCOLOR_TRANSPARENT)
+	$cCat = GUICtrlCreateCombo("", 140, 50, 350, 25)
+
+	GUICtrlSetData($cCat, $aCategory[0] & "|" & $aCategory[1] & "|" & $aCategory[2] & "|" & $aCategory[3] & "|" & _
+	$aCategory[4] & "|" & $aCategory[5] & "|" & $aCategory[6] & "|" & $aCategory[7] & "|" & _
+	$aCategory[8] & "|" & $aCategory[9] & "|" & $aCategory[10] & "|" & $aCategory[11] & "|" & _
+	$aCategory[12] & "|" & $aCategory[13] & "|" & $aCategory[14] & "|" & $aCategory[15], " ")
+
+	$bBR = GUICtrlCreateButton(" ... ", 140, 15, 50, 20)
+	GUICtrlSetCursor($bBR, 0)
+	GUICtrlSetStyle($bBR, $BS_CENTER)
+
+	$bOK = GUICtrlCreateButton("Mentés", 500, 15, 90, 20)
+	GUICtrlSetCursor($bOK, 0)
+	GUICtrlSetStyle($bOK, $BS_CENTER)
+
+	$bCA = GUICtrlCreateButton("Mégse", 500, 52, 90, 20)
+	GUICtrlSetCursor($bCA, 0)
+	GUICtrlSetStyle($bCA, $BS_CENTER)
+
+	GUISetState(@SW_SHOW, $AddGUI)
+	While - 1
+		Switch GUIGetMsg()
+			Case $GUI_EVENT_CLOSE, $bCA ; exit
+				GUIDelete($AddGUI)
+				ExitLoop
+			Case $bBR ; save
+				AddBR()
+			Case $bOK ; browse
+				AddApp()
+				GUIDelete($AddGUI)
+				ExitLoop
+		EndSwitch
+	WEnd
+EndFunc		;==>AddAppGUI
+
+Func RemApp()
+	;read data
+	$cNameOr = GUICtrlRead($cNameOr)
+	$cNameMo = $cNameOr
+
+	; modulate data
+	For $i = 0 To 256 Step 1
+		If StringInStr($cNameMo, "\") = True Then $cNameMo = StringTrimLeft($cNameMo, StringInStr($cNameMo, "\"))
+	Next
+	Global $i = 0 ; reset sequence variables
+
+	; run dos
+	_RunDos("MOVE " & '"' & $appD & "\" & $cNameOr & '"' & " " & '"' & $trashD & "\"  & $cNameMo & '"')
+
+	; error check
+	if @error Then
+		MsgBox(16, "Error", "Alkalmazást nem sikerült törölni!" & @CRLF & "A program újraindul!", 1, $RemGUI)
+	Else
+		MsgBox(64, "Info", "Alkalmazás a lomtárba került!" & @CRLF & "A program újraindul!", 1, $RemGUI)
+	EndIf
+EndFunc		;==>RemApp
+
+Func RemAppGUI()
+	$RemGUI = GUICreate("Alaklmazás eltávolítása a menüből", 600, 600, -1, -1, -1, -1, 0)
+	GUISetFont(8, $FW_MEDIUM, "", "Comic Sans Ms", $RemGUI, $CLEARTYPE_QUALITY)
+	GUISetBkColor(0x2D2D2D)
+	GUICtrlSetDefColor(0xFFFFFF, $RemGUI)
+	GUICtrlSetDefBkColor(0x2D2D2D, $RemGUI)
+
+	; create controls
+	GUICtrlCreateGroup("", 5, 5, 590, 590)
+	GUICtrlSetBkColor(GUICtrlCreateLabel("Alkalmazás kiválasztása: ", 15, 15), $GUI_BKCOLOR_TRANSPARENT)
+	$cNameOr = GUICtrlCreateList("", 140, 15, 350, 590)
+
+	Global $i = 0 ; reset sequence variables
+	For $i = 0 To 255 Step 1
+		If BinaryToString(IniRead($cfg, "Applications", $i, ""), $SB_ANSI) <> "" Then GUICtrlSetData($cNameOr, BinaryToString(IniRead($cfg, "Applications", $i, ""), $SB_ANSI))
+	Next
+
+	$bOK = GUICtrlCreateButton("Törlés", 500, 15, 90, 20)
+	GUICtrlSetCursor($bOK, 0)
+	GUICtrlSetStyle($bOK, $BS_CENTER)
+
+	$bCA = GUICtrlCreateButton("Mégse", 500, 52, 90, 20)
+	GUICtrlSetCursor($bCA, 0)
+	GUICtrlSetStyle($bCA, $BS_CENTER)
+
+	GUISetState(@SW_SHOW, $RemGUI)
+	While - 1
+		Switch GUIGetMsg()
+			Case $GUI_EVENT_CLOSE, $bCA ; exit
+				GUIDelete($RemGUI)
+				ExitLoop
+			Case $bOK ; browse
+				RemApp()
+				GUIDelete($RemGUI)
+				ExitLoop
+		EndSwitch
+	WEnd
+EndFunc		;==>RemAppGUI
+
+Func Main()
 	; delete old guis
-	GUIDelete($iGUI)
-	GUIDelete($mGUI)
+	GUIDelete($initGUI)
+	GUIDelete($mainGUI)
 
 	; define gui
-	Global $mGUI = GUICreate($sysName, 1000, 400, -1, -1, -1, -1, 0)
+	Global $mainGUI = GUICreate($sysName, 1200, 600, -1, -1, -1, -1, 0)
 	GUISetIcon($icon, 0)
-	GUISetFont(8, $FW_MEDIUM, "", "Comic Sans Ms", $mGUI, $CLEARTYPE_QUALITY)
-	WinSetTrans($mGUI, "", 250)
+	GUISetFont(8, $FW_MEDIUM, "", "Comic Sans Ms", $mainGUI, $CLEARTYPE_QUALITY)
+	WinSetTrans($mainGUI, "", 250)
 	GUISetBkColor(0x2D2D2D)
-	GUICtrlSetDefColor(0xFFFFFF, $mGUI)
-	GUICtrlSetDefBkColor(0x2D2D2D, $mGUI)
+	GUICtrlSetDefColor(0xFFFFFF, $mainGUI)
+	GUICtrlSetDefBkColor(0x2D2D2D, $mainGUI)
 
-	; load background
-	GUICtrlCreatePic($back, 0, 0, 1000, 400, $BS_BITMAP) ; if bitmap
-	MP()
+	; create background
+	PickDisplay()
+	;VideoDisplay()
 
-	; generating data
-	Global $CatD[16], $NameD[256], $AppF[256] ; reset variables for create menu system
-	Global $i = 0, $j = 0, $k = 0, $l = 0, $m = 0, $n = 0 ; sequence variables
+	; create info
+	InfoDisplay()
 
-	; reading menu category data from $cfg - menu
-	For $i = 0 To 15 Step 1
-		If IniRead($cfg, "CatD", "$CatD[" & $i & "]", "") <> "" Then
-			$CatD[$i] = IniRead($cfg, "CatD", "$CatD[" & $i & "]", "")
-			$CatD[$i] = BinaryToString($CatD[$i], $SB_ANSI)
-			; create menu
-			If $CatD[$i] <> "" Then $CatD[$i] = Execute($CatD[$i])
-		Else
-		EndIf
-	Next
+	; create buttons
+	ButtonDisplay()
 
-	; reading menu program name data from $cfg - submenu
-	For $j = 0 To 225 Step 1
-		If IniRead($cfg, "NameD", "$NameD[" & $j & "]", "") <> "" Then
-			$NameD[$j] = IniRead($cfg, "NameD", "$NameD[" & $j & "]", "")
-			$NameD[$j] = BinaryToString($NameD[$j], $SB_ANSI)
-			; create submenu
-			If $NameD[$j] <> "" Then $NameD[$j] = Execute($NameD[$j])
-		Else
-		EndIf
-	Next
-
-	; reading menu program path data from $cfg - menuitem
-	For $k = 0 To 255 Step 1
-		If IniRead($cfg, "AppF", "$AppF[" & $k & "]", "") <> "" Then
-			$AppF[$k] = IniRead($cfg, "AppF", "$AppF[" & $k & "]", "")
-			$AppF[$k] = BinaryToString($AppF[$k], $SB_ANSI)
-			; create menuitems
-			If $AppF[$k] <> "" Then $AppF[$k] = Execute($AppF[$k])
-		Else
-		EndIf
-	Next
-
-	; exit button [0]
-	;$Btn = GUICtrlCreateButton("  " & "Kilépés", 840, 320, 150, 50, $BS_ICON)
-	;GUICtrlSetImage($Btn, $bExit, "", 2)
-	;GUICtrlSetCursor($Btn, 0)
-	;GUICtrlSetStyle($Btn, $BS_LEFT)
+	; create menu
+	MenuDisplay()
 
 	; show gui
-	GUISetState(@SW_SHOW, $mGUI)
-EndFunc   ;==>mGUI
+	GUISetState(@SW_SHOW, $mainGUI)
+EndFunc		;==>mGUI
+
+Func RunMenu()
+
+EndFunc		;==>RunMenu
 
 ; *** SYSTEM CORE ***
 While - 1
 	Switch GUIGetMsg()
-		Case $GUI_EVENT_CLOSE;, $Btn ; exit
-			GUIDelete($mGUI)
+		Case $GUI_EVENT_CLOSE, $bExit ; exit
+			GUIDelete($mainGUI)
 			ExitLoop
 
-			; menu array
-		Case $AppF[0]
-			If $AppF[0] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "0", ""), $SB_ANSI))
-		Case $AppF[1]
-			If $AppF[1] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "1", ""), $SB_ANSI))
-		Case $AppF[2]
-			If $AppF[2] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "2", ""), $SB_ANSI))
-		Case $AppF[3]
-			If $AppF[3] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "3", ""), $SB_ANSI))
-		Case $AppF[4]
-			If $AppF[4] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "4", ""), $SB_ANSI))
-		Case $AppF[5]
-			If $AppF[5] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "5", ""), $SB_ANSI))
-		Case $AppF[6]
-			If $AppF[6] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "6", ""), $SB_ANSI))
-		Case $AppF[7]
-			If $AppF[7] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "7", ""), $SB_ANSI))
-		Case $AppF[8]
-			If $AppF[8] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "8", ""), $SB_ANSI))
-		Case $AppF[9]
-			If $AppF[9] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "9", ""), $SB_ANSI))
-		Case $AppF[10]
-			If $AppF[10] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "10", ""), $SB_ANSI))
-		Case $AppF[11]
-			If $AppF[11] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "11", ""), $SB_ANSI))
-		Case $AppF[12]
-			If $AppF[12] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "12", ""), $SB_ANSI))
-		Case $AppF[13]
-			If $AppF[13] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "13", ""), $SB_ANSI))
-		Case $AppF[14]
-			If $AppF[14] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "14", ""), $SB_ANSI))
-		Case $AppF[15]
-			If $AppF[15] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "15", ""), $SB_ANSI))
-		Case $AppF[16]
-			If $AppF[16] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "16", ""), $SB_ANSI))
-		Case $AppF[17]
-			If $AppF[17] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "17", ""), $SB_ANSI))
-		Case $AppF[18]
-			If $AppF[18] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "18", ""), $SB_ANSI))
-		Case $AppF[19]
-			If $AppF[19] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "19", ""), $SB_ANSI))
-		Case $AppF[20]
-			If $AppF[20] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "20", ""), $SB_ANSI))
-		Case $AppF[21]
-			If $AppF[21] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "21", ""), $SB_ANSI))
-		Case $AppF[22]
-			If $AppF[22] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "22", ""), $SB_ANSI))
-		Case $AppF[23]
-			If $AppF[23] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "23", ""), $SB_ANSI))
-		Case $AppF[24]
-			If $AppF[24] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "24", ""), $SB_ANSI))
-		Case $AppF[25]
-			If $AppF[25] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "25", ""), $SB_ANSI))
-		Case $AppF[26]
-			If $AppF[26] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "26", ""), $SB_ANSI))
-		Case $AppF[27]
-			If $AppF[27] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "27", ""), $SB_ANSI))
-		Case $AppF[28]
-			If $AppF[28] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "28", ""), $SB_ANSI))
-		Case $AppF[29]
-			If $AppF[29] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "29", ""), $SB_ANSI))
-		Case $AppF[30]
-			If $AppF[30] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "30", ""), $SB_ANSI))
-		Case $AppF[31]
-			If $AppF[31] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "31", ""), $SB_ANSI))
-		Case $AppF[32]
-			If $AppF[32] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "32", ""), $SB_ANSI))
-		Case $AppF[33]
-			If $AppF[33] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "33", ""), $SB_ANSI))
-		Case $AppF[34]
-			If $AppF[34] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "34", ""), $SB_ANSI))
-		Case $AppF[35]
-			If $AppF[35] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "35", ""), $SB_ANSI))
-		Case $AppF[36]
-			If $AppF[36] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "36", ""), $SB_ANSI))
-		Case $AppF[37]
-			If $AppF[37] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "37", ""), $SB_ANSI))
-		Case $AppF[38]
-			If $AppF[38] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "38", ""), $SB_ANSI))
-		Case $AppF[39]
-			If $AppF[39] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "39", ""), $SB_ANSI))
-		Case $AppF[40]
-			If $AppF[40] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "40", ""), $SB_ANSI))
-		Case $AppF[41]
-			If $AppF[41] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "41", ""), $SB_ANSI))
-		Case $AppF[42]
-			If $AppF[42] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "42", ""), $SB_ANSI))
-		Case $AppF[43]
-			If $AppF[43] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "43", ""), $SB_ANSI))
-		Case $AppF[44]
-			If $AppF[44] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "44", ""), $SB_ANSI))
-		Case $AppF[45]
-			If $AppF[45] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "45", ""), $SB_ANSI))
-		Case $AppF[46]
-			If $AppF[46] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "46", ""), $SB_ANSI))
-		Case $AppF[47]
-			If $AppF[47] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "47", ""), $SB_ANSI))
-		Case $AppF[48]
-			If $AppF[48] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "48", ""), $SB_ANSI))
-		Case $AppF[49]
-			If $AppF[49] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "49", ""), $SB_ANSI))
-		Case $AppF[50]
-			If $AppF[50] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "50", ""), $SB_ANSI))
-		Case $AppF[51]
-			If $AppF[51] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "51", ""), $SB_ANSI))
-		Case $AppF[52]
-			If $AppF[52] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "52", ""), $SB_ANSI))
-		Case $AppF[53]
-			If $AppF[53] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "53", ""), $SB_ANSI))
-		Case $AppF[54]
-			If $AppF[54] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "54", ""), $SB_ANSI))
-		Case $AppF[55]
-			If $AppF[55] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "55", ""), $SB_ANSI))
-		Case $AppF[56]
-			If $AppF[56] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "56", ""), $SB_ANSI))
-		Case $AppF[57]
-			If $AppF[57] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "57", ""), $SB_ANSI))
-		Case $AppF[58]
-			If $AppF[58] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "58", ""), $SB_ANSI))
-		Case $AppF[59]
-			If $AppF[59] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "59", ""), $SB_ANSI))
-		Case $AppF[60]
-			If $AppF[60] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "60", ""), $SB_ANSI))
-		Case $AppF[61]
-			If $AppF[61] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "61", ""), $SB_ANSI))
-		Case $AppF[62]
-			If $AppF[62] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "62", ""), $SB_ANSI))
-		Case $AppF[63]
-			If $AppF[63] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "63", ""), $SB_ANSI))
-		Case $AppF[64]
-			If $AppF[64] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "64", ""), $SB_ANSI))
-		Case $AppF[65]
-			If $AppF[65] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "65", ""), $SB_ANSI))
-		Case $AppF[66]
-			If $AppF[66] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "66", ""), $SB_ANSI))
-		Case $AppF[67]
-			If $AppF[67] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "67", ""), $SB_ANSI))
-		Case $AppF[68]
-			If $AppF[68] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "68", ""), $SB_ANSI))
-		Case $AppF[69]
-			If $AppF[69] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "69", ""), $SB_ANSI))
-		Case $AppF[70]
-			If $AppF[70] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "70", ""), $SB_ANSI))
-		Case $AppF[71]
-			If $AppF[71] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "71", ""), $SB_ANSI))
-		Case $AppF[72]
-			If $AppF[72] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "72", ""), $SB_ANSI))
-		Case $AppF[73]
-			If $AppF[73] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "73", ""), $SB_ANSI))
-		Case $AppF[74]
-			If $AppF[74] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "74", ""), $SB_ANSI))
-		Case $AppF[75]
-			If $AppF[75] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "75", ""), $SB_ANSI))
-		Case $AppF[76]
-			If $AppF[76] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "76", ""), $SB_ANSI))
-		Case $AppF[77]
-			If $AppF[77] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "77", ""), $SB_ANSI))
-		Case $AppF[78]
-			If $AppF[78] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "78", ""), $SB_ANSI))
-		Case $AppF[79]
-			If $AppF[79] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "79", ""), $SB_ANSI))
-		Case $AppF[80]
-			If $AppF[80] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "80", ""), $SB_ANSI))
-		Case $AppF[81]
-			If $AppF[81] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "81", ""), $SB_ANSI))
-		Case $AppF[82]
-			If $AppF[82] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "82", ""), $SB_ANSI))
-		Case $AppF[83]
-			If $AppF[83] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "83", ""), $SB_ANSI))
-		Case $AppF[84]
-			If $AppF[84] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "84", ""), $SB_ANSI))
-		Case $AppF[85]
-			If $AppF[85] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "85", ""), $SB_ANSI))
-		Case $AppF[86]
-			If $AppF[86] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "86", ""), $SB_ANSI))
-		Case $AppF[87]
-			If $AppF[87] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "87", ""), $SB_ANSI))
-		Case $AppF[88]
-			If $AppF[88] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "88", ""), $SB_ANSI))
-		Case $AppF[89]
-			If $AppF[89] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "89", ""), $SB_ANSI))
-		Case $AppF[90]
-			If $AppF[90] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "90", ""), $SB_ANSI))
-		Case $AppF[91]
-			If $AppF[91] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "91", ""), $SB_ANSI))
-		Case $AppF[92]
-			If $AppF[92] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "92", ""), $SB_ANSI))
-		Case $AppF[93]
-			If $AppF[93] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "93", ""), $SB_ANSI))
-		Case $AppF[94]
-			If $AppF[94] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "94", ""), $SB_ANSI))
-		Case $AppF[95]
-			If $AppF[95] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "95", ""), $SB_ANSI))
-		Case $AppF[96]
-			If $AppF[96] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "96", ""), $SB_ANSI))
-		Case $AppF[97]
-			If $AppF[97] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "97", ""), $SB_ANSI))
-		Case $AppF[98]
-			If $AppF[98] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "98", ""), $SB_ANSI))
-		Case $AppF[99]
-			If $AppF[99] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "99", ""), $SB_ANSI))
-		Case $AppF[100]
-			If $AppF[100] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "100", ""), $SB_ANSI))
-		Case $AppF[101]
-			If $AppF[101] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "101", ""), $SB_ANSI))
-		Case $AppF[102]
-			If $AppF[102] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "102", ""), $SB_ANSI))
-		Case $AppF[103]
-			If $AppF[103] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "103", ""), $SB_ANSI))
-		Case $AppF[104]
-			If $AppF[104] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "104", ""), $SB_ANSI))
-		Case $AppF[105]
-			If $AppF[105] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "105", ""), $SB_ANSI))
-		Case $AppF[106]
-			If $AppF[106] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "106", ""), $SB_ANSI))
-		Case $AppF[107]
-			If $AppF[107] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "107", ""), $SB_ANSI))
-		Case $AppF[108]
-			If $AppF[108] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "108", ""), $SB_ANSI))
-		Case $AppF[109]
-			If $AppF[109] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "109", ""), $SB_ANSI))
-		Case $AppF[110]
-			If $AppF[110] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "110", ""), $SB_ANSI))
-		Case $AppF[111]
-			If $AppF[111] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "111", ""), $SB_ANSI))
-		Case $AppF[112]
-			If $AppF[112] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "112", ""), $SB_ANSI))
-		Case $AppF[113]
-			If $AppF[113] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "113", ""), $SB_ANSI))
-		Case $AppF[114]
-			If $AppF[114] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "114", ""), $SB_ANSI))
-		Case $AppF[115]
-			If $AppF[115] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "115", ""), $SB_ANSI))
-		Case $AppF[116]
-			If $AppF[116] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "116", ""), $SB_ANSI))
-		Case $AppF[117]
-			If $AppF[117] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "117", ""), $SB_ANSI))
-		Case $AppF[118]
-			If $AppF[118] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "118", ""), $SB_ANSI))
-		Case $AppF[119]
-			If $AppF[119] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "119", ""), $SB_ANSI))
-		Case $AppF[120]
-			If $AppF[120] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "120", ""), $SB_ANSI))
-		Case $AppF[121]
-			If $AppF[121] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "121", ""), $SB_ANSI))
-		Case $AppF[122]
-			If $AppF[122] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "122", ""), $SB_ANSI))
-		Case $AppF[123]
-			If $AppF[123] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "123", ""), $SB_ANSI))
-		Case $AppF[124]
-			If $AppF[124] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "124", ""), $SB_ANSI))
-		Case $AppF[125]
-			If $AppF[125] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "125", ""), $SB_ANSI))
-		Case $AppF[126]
-			If $AppF[126] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "126", ""), $SB_ANSI))
-		Case $AppF[127]
-			If $AppF[127] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "127", ""), $SB_ANSI))
-		Case $AppF[128]
-			If $AppF[128] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "128", ""), $SB_ANSI))
-		Case $AppF[129]
-			If $AppF[129] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "129", ""), $SB_ANSI))
-		Case $AppF[130]
-			If $AppF[130] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "130", ""), $SB_ANSI))
-		Case $AppF[131]
-			If $AppF[131] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "131", ""), $SB_ANSI))
-		Case $AppF[132]
-			If $AppF[132] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "132", ""), $SB_ANSI))
-		Case $AppF[133]
-			If $AppF[133] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "133", ""), $SB_ANSI))
-		Case $AppF[134]
-			If $AppF[134] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "134", ""), $SB_ANSI))
-		Case $AppF[135]
-			If $AppF[135] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "135", ""), $SB_ANSI))
-		Case $AppF[136]
-			If $AppF[136] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "136", ""), $SB_ANSI))
-		Case $AppF[137]
-			If $AppF[137] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "137", ""), $SB_ANSI))
-		Case $AppF[138]
-			If $AppF[138] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "138", ""), $SB_ANSI))
-		Case $AppF[139]
-			If $AppF[139] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "139", ""), $SB_ANSI))
-		Case $AppF[140]
-			If $AppF[140] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "140", ""), $SB_ANSI))
-		Case $AppF[141]
-			If $AppF[141] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "141", ""), $SB_ANSI))
-		Case $AppF[142]
-			If $AppF[142] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "142", ""), $SB_ANSI))
-		Case $AppF[143]
-			If $AppF[143] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "143", ""), $SB_ANSI))
-		Case $AppF[144]
-			If $AppF[144] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "144", ""), $SB_ANSI))
-		Case $AppF[145]
-			If $AppF[145] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "145", ""), $SB_ANSI))
-		Case $AppF[146]
-			If $AppF[146] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "146", ""), $SB_ANSI))
-		Case $AppF[147]
-			If $AppF[147] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "147", ""), $SB_ANSI))
-		Case $AppF[148]
-			If $AppF[148] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "148", ""), $SB_ANSI))
-		Case $AppF[149]
-			If $AppF[149] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "149", ""), $SB_ANSI))
-		Case $AppF[150]
-			If $AppF[150] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "150", ""), $SB_ANSI))
-		Case $AppF[151]
-			If $AppF[151] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "151", ""), $SB_ANSI))
-		Case $AppF[152]
-			If $AppF[155] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "152", ""), $SB_ANSI))
-		Case $AppF[153]
-			If $AppF[155] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "153", ""), $SB_ANSI))
-		Case $AppF[154]
-			If $AppF[155] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "154", ""), $SB_ANSI))
-		Case $AppF[155]
-			If $AppF[155] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "155", ""), $SB_ANSI))
-		Case $AppF[156]
-			If $AppF[156] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "156", ""), $SB_ANSI))
-		Case $AppF[157]
-			If $AppF[157] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "157", ""), $SB_ANSI))
-		Case $AppF[158]
-			If $AppF[158] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "158", ""), $SB_ANSI))
-		Case $AppF[159]
-			If $AppF[159] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "159", ""), $SB_ANSI))
-		Case $AppF[160]
-			If $AppF[160] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "160", ""), $SB_ANSI))
-		Case $AppF[161]
-			If $AppF[161] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "161", ""), $SB_ANSI))
-		Case $AppF[162]
-			If $AppF[162] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "162", ""), $SB_ANSI))
-		Case $AppF[163]
-			If $AppF[163] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "163", ""), $SB_ANSI))
-		Case $AppF[164]
-			If $AppF[164] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "164", ""), $SB_ANSI))
-		Case $AppF[165]
-			If $AppF[165] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "165", ""), $SB_ANSI))
-		Case $AppF[166]
-			If $AppF[166] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "166", ""), $SB_ANSI))
-		Case $AppF[167]
-			If $AppF[167] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "167", ""), $SB_ANSI))
-		Case $AppF[168]
-			If $AppF[168] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "168", ""), $SB_ANSI))
-		Case $AppF[169]
-			If $AppF[169] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "169", ""), $SB_ANSI))
-		Case $AppF[170]
-			If $AppF[170] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "170", ""), $SB_ANSI))
-		Case $AppF[171]
-			If $AppF[171] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "171", ""), $SB_ANSI))
-		Case $AppF[172]
-			If $AppF[172] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "172", ""), $SB_ANSI))
-		Case $AppF[173]
-			If $AppF[173] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "173", ""), $SB_ANSI))
-		Case $AppF[174]
-			If $AppF[174] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "174", ""), $SB_ANSI))
-		Case $AppF[175]
-			If $AppF[175] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "175", ""), $SB_ANSI))
-		Case $AppF[176]
-			If $AppF[176] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "176", ""), $SB_ANSI))
-		Case $AppF[177]
-			If $AppF[177] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "177", ""), $SB_ANSI))
-		Case $AppF[178]
-			If $AppF[178] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "178", ""), $SB_ANSI))
-		Case $AppF[179]
-			If $AppF[179] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "179", ""), $SB_ANSI))
-		Case $AppF[180]
-			If $AppF[180] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "180", ""), $SB_ANSI))
-		Case $AppF[181]
-			If $AppF[181] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "181", ""), $SB_ANSI))
-		Case $AppF[182]
-			If $AppF[182] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "182", ""), $SB_ANSI))
-		Case $AppF[183]
-			If $AppF[183] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "183", ""), $SB_ANSI))
-		Case $AppF[184]
-			If $AppF[184] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "184", ""), $SB_ANSI))
-		Case $AppF[185]
-			If $AppF[185] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "185", ""), $SB_ANSI))
-		Case $AppF[186]
-			If $AppF[186] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "186", ""), $SB_ANSI))
-		Case $AppF[187]
-			If $AppF[187] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "187", ""), $SB_ANSI))
-		Case $AppF[188]
-			If $AppF[188] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "188", ""), $SB_ANSI))
-		Case $AppF[189]
-			If $AppF[189] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "189", ""), $SB_ANSI))
-		Case $AppF[190]
-			If $AppF[190] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "190", ""), $SB_ANSI))
-		Case $AppF[191]
-			If $AppF[191] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "191", ""), $SB_ANSI))
-		Case $AppF[192]
-			If $AppF[192] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "192", ""), $SB_ANSI))
-		Case $AppF[193]
-			If $AppF[193] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "193", ""), $SB_ANSI))
-		Case $AppF[194]
-			If $AppF[194] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "194", ""), $SB_ANSI))
-		Case $AppF[195]
-			If $AppF[195] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "195", ""), $SB_ANSI))
-		Case $AppF[196]
-			If $AppF[196] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "196", ""), $SB_ANSI))
-		Case $AppF[197]
-			If $AppF[197] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "197", ""), $SB_ANSI))
-		Case $AppF[198]
-			If $AppF[198] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "198", ""), $SB_ANSI))
-		Case $AppF[199]
-			If $AppF[199] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "199", ""), $SB_ANSI))
-		Case $AppF[200]
-			If $AppF[200] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "200", ""), $SB_ANSI))
-		Case $AppF[201]
-			If $AppF[201] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "201", ""), $SB_ANSI))
-		Case $AppF[202]
-			If $AppF[202] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "202", ""), $SB_ANSI))
-		Case $AppF[203]
-			If $AppF[203] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "203", ""), $SB_ANSI))
-		Case $AppF[204]
-			If $AppF[204] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "204", ""), $SB_ANSI))
-		Case $AppF[205]
-			If $AppF[205] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "205", ""), $SB_ANSI))
-		Case $AppF[206]
-			If $AppF[206] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "206", ""), $SB_ANSI))
-		Case $AppF[207]
-			If $AppF[207] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "207", ""), $SB_ANSI))
-		Case $AppF[208]
-			If $AppF[208] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "208", ""), $SB_ANSI))
-		Case $AppF[209]
-			If $AppF[209] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "209", ""), $SB_ANSI))
-		Case $AppF[210]
-			If $AppF[210] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "210", ""), $SB_ANSI))
-		Case $AppF[211]
-			If $AppF[211] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "211", ""), $SB_ANSI))
-		Case $AppF[212]
-			If $AppF[212] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "212", ""), $SB_ANSI))
-		Case $AppF[213]
-			If $AppF[213] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "213", ""), $SB_ANSI))
-		Case $AppF[214]
-			If $AppF[214] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "214", ""), $SB_ANSI))
-		Case $AppF[215]
-			If $AppF[215] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "215", ""), $SB_ANSI))
-		Case $AppF[216]
-			If $AppF[216] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "216", ""), $SB_ANSI))
-		Case $AppF[217]
-			If $AppF[217] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "217", ""), $SB_ANSI))
-		Case $AppF[218]
-			If $AppF[218] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "218", ""), $SB_ANSI))
-		Case $AppF[219]
-			If $AppF[219] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "219", ""), $SB_ANSI))
-		Case $AppF[220]
-			If $AppF[220] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "220", ""), $SB_ANSI))
-		Case $AppF[221]
-			If $AppF[221] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "221", ""), $SB_ANSI))
-		Case $AppF[222]
-			If $AppF[222] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "222", ""), $SB_ANSI))
-		Case $AppF[223]
-			If $AppF[223] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "223", ""), $SB_ANSI))
-		Case $AppF[224]
-			If $AppF[224] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "224", ""), $SB_ANSI))
-		Case $AppF[225]
-			If $AppF[225] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "225", ""), $SB_ANSI))
-		Case $AppF[226]
-			If $AppF[226] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "226", ""), $SB_ANSI))
-		Case $AppF[227]
-			If $AppF[227] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "227", ""), $SB_ANSI))
-		Case $AppF[228]
-			If $AppF[228] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "228", ""), $SB_ANSI))
-		Case $AppF[229]
-			If $AppF[229] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "229", ""), $SB_ANSI))
-		Case $AppF[230]
-			If $AppF[230] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "230", ""), $SB_ANSI))
-		Case $AppF[231]
-			If $AppF[231] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "231", ""), $SB_ANSI))
-		Case $AppF[232]
-			If $AppF[232] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "232", ""), $SB_ANSI))
-		Case $AppF[233]
-			If $AppF[233] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "233", ""), $SB_ANSI))
-		Case $AppF[234]
-			If $AppF[234] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "234", ""), $SB_ANSI))
-		Case $AppF[235]
-			If $AppF[235] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "235", ""), $SB_ANSI))
-		Case $AppF[236]
-			If $AppF[236] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "236", ""), $SB_ANSI))
-		Case $AppF[237]
-			If $AppF[237] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "237", ""), $SB_ANSI))
-		Case $AppF[238]
-			If $AppF[238] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "238", ""), $SB_ANSI))
-		Case $AppF[239]
-			If $AppF[239] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "239", ""), $SB_ANSI))
-		Case $AppF[240]
-			If $AppF[240] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "240", ""), $SB_ANSI))
-		Case $AppF[241]
-			If $AppF[241] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "241", ""), $SB_ANSI))
-		Case $AppF[242]
-			If $AppF[242] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "242", ""), $SB_ANSI))
-		Case $AppF[243]
-			If $AppF[243] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "243", ""), $SB_ANSI))
-		Case $AppF[244]
-			If $AppF[244] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "244", ""), $SB_ANSI))
-		Case $AppF[245]
-			If $AppF[245] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "245", ""), $SB_ANSI))
-		Case $AppF[246]
-			If $AppF[246] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "246", ""), $SB_ANSI))
-		Case $AppF[247]
-			If $AppF[247] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "247", ""), $SB_ANSI))
-		Case $AppF[248]
-			If $AppF[248] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "248", ""), $SB_ANSI))
-		Case $AppF[249]
-			If $AppF[249] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "249", ""), $SB_ANSI))
-		Case $AppF[250]
-			If $AppF[250] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "250", ""), $SB_ANSI))
-		Case $AppF[251]
-			If $AppF[251] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "251", ""), $SB_ANSI))
-		Case $AppF[252]
-			If $AppF[252] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "252", ""), $SB_ANSI))
-		Case $AppF[253]
-			If $AppF[253] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "253", ""), $SB_ANSI))
-		Case $AppF[254]
-			If $AppF[254] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "254", ""), $SB_ANSI))
-		Case $AppF[255]
-			If $AppF[255] <> "" Then ShellExecute(BinaryToString(IniRead($cfg, "ShellExecute", "255", ""), $SB_ANSI))
+		; open Control AdminTools
+		Case $bCAT
+			Run("control admintools")
+		; open Control Panel
+		Case $bCP
+			Run("control")
+		; open Settings
+		Case $bS
+			ShellExecute("ms-settings://")
+		; open PowerShell
+		Case $bPS
+			Run("powershell")
+		; open CMD
+		Case $bCMD
+			Run("cmd")
+		; add program
+		Case $bAdd
+			AddAppGUI()
+			GUIDelete($mainGUI)
+			Init()
+		; remove program
+		Case $bRem
+			RemAppGUI()
+			GUIDelete($mainGUI)
+			Init()
+
+		; menu array
+		Case $rExecutable[0]
+			If $rRun[0] <> "" Then ShellExecute($rRun[0])
+		Case $rExecutable[1]
+			If $rRun[1] <> "" Then ShellExecute($rRun[1])
+		Case $rExecutable[2]
+			If $rRun[2] <> "" Then ShellExecute($rRun[2])
+		Case $rExecutable[3]
+			If $rRun[3] <> "" Then ShellExecute($rRun[3])
+		Case $rExecutable[4]
+			If $rRun[4] <> "" Then ShellExecute($rRun[4])
+		Case $rExecutable[5]
+			If $rRun[5] <> "" Then ShellExecute($rRun[5])
+		Case $rExecutable[6]
+			If $rRun[6] <> "" Then ShellExecute($rRun[6])
+		Case $rExecutable[7]
+			If $rRun[7] <> "" Then ShellExecute($rRun[7])
+		Case $rExecutable[8]
+			If $rRun[8] <> "" Then ShellExecute($rRun[8])
+		Case $rExecutable[9]
+			If $rRun[9] <> "" Then ShellExecute($rRun[9])
+		Case $rExecutable[10]
+			If $rRun[10] <> "" Then ShellExecute($rRun[10])
+		Case $rExecutable[11]
+			If $rRun[11] <> "" Then ShellExecute($rRun[11])
+		Case $rExecutable[12]
+			If $rRun[12] <> "" Then ShellExecute($rRun[12])
+		Case $rExecutable[13]
+			If $rRun[13] <> "" Then ShellExecute($rRun[13])
+		Case $rExecutable[14]
+			If $rRun[14] <> "" Then ShellExecute($rRun[14])
+		Case $rExecutable[15]
+			If $rRun[15] <> "" Then ShellExecute($rRun[15])
+		Case $rExecutable[16]
+			If $rRun[16] <> "" Then ShellExecute($rRun[16])
+		Case $rExecutable[17]
+			If $rRun[17] <> "" Then ShellExecute($rRun[17])
+		Case $rExecutable[18]
+			If $rRun[18] <> "" Then ShellExecute($rRun[18])
+		Case $rExecutable[19]
+			If $rRun[19] <> "" Then ShellExecute($rRun[19])
+		Case $rExecutable[20]
+			If $rRun[20] <> "" Then ShellExecute($rRun[20])
+		Case $rExecutable[21]
+			If $rRun[21] <> "" Then ShellExecute($rRun[21])
+		Case $rExecutable[22]
+			If $rRun[22] <> "" Then ShellExecute($rRun[22])
+		Case $rExecutable[23]
+			If $rRun[23] <> "" Then ShellExecute($rRun[23])
+		Case $rExecutable[24]
+			If $rRun[24] <> "" Then ShellExecute($rRun[24])
+		Case $rExecutable[25]
+			If $rRun[25] <> "" Then ShellExecute($rRun[25])
+		Case $rExecutable[26]
+			If $rRun[26] <> "" Then ShellExecute($rRun[26])
+		Case $rExecutable[27]
+			If $rRun[27] <> "" Then ShellExecute($rRun[27])
+		Case $rExecutable[28]
+			If $rRun[28] <> "" Then ShellExecute($rRun[28])
+		Case $rExecutable[29]
+			If $rRun[29] <> "" Then ShellExecute($rRun[29])
+		Case $rExecutable[30]
+			If $rRun[30] <> "" Then ShellExecute($rRun[30])
+		Case $rExecutable[31]
+			If $rRun[31] <> "" Then ShellExecute($rRun[31])
+		Case $rExecutable[32]
+			If $rRun[32] <> "" Then ShellExecute($rRun[32])
+		Case $rExecutable[33]
+			If $rRun[33] <> "" Then ShellExecute($rRun[33])
+		Case $rExecutable[34]
+			If $rRun[34] <> "" Then ShellExecute($rRun[34])
+		Case $rExecutable[35]
+			If $rRun[35] <> "" Then ShellExecute($rRun[35])
+		Case $rExecutable[36]
+			If $rRun[36] <> "" Then ShellExecute($rRun[36])
+		Case $rExecutable[37]
+			If $rRun[37] <> "" Then ShellExecute($rRun[37])
+		Case $rExecutable[38]
+			If $rRun[38] <> "" Then ShellExecute($rRun[38])
+		Case $rExecutable[39]
+			If $rRun[39] <> "" Then ShellExecute($rRun[39])
+		Case $rExecutable[40]
+			If $rRun[40] <> "" Then ShellExecute($rRun[40])
+		Case $rExecutable[41]
+			If $rRun[41] <> "" Then ShellExecute($rRun[41])
+		Case $rExecutable[42]
+			If $rRun[42] <> "" Then ShellExecute($rRun[42])
+		Case $rExecutable[43]
+			If $rRun[43] <> "" Then ShellExecute($rRun[43])
+		Case $rExecutable[44]
+			If $rRun[44] <> "" Then ShellExecute($rRun[44])
+		Case $rExecutable[45]
+			If $rRun[45] <> "" Then ShellExecute($rRun[45])
+		Case $rExecutable[46]
+			If $rRun[46] <> "" Then ShellExecute($rRun[46])
+		Case $rExecutable[47]
+			If $rRun[47] <> "" Then ShellExecute($rRun[47])
+		Case $rExecutable[48]
+			If $rRun[48] <> "" Then ShellExecute($rRun[48])
+		Case $rExecutable[49]
+			If $rRun[49] <> "" Then ShellExecute($rRun[49])
+		Case $rExecutable[50]
+			If $rRun[50] <> "" Then ShellExecute($rRun[50])
+		Case $rExecutable[51]
+			If $rRun[51] <> "" Then ShellExecute($rRun[51])
+		Case $rExecutable[52]
+			If $rRun[52] <> "" Then ShellExecute($rRun[52])
+		Case $rExecutable[53]
+			If $rRun[53] <> "" Then ShellExecute($rRun[53])
+		Case $rExecutable[54]
+			If $rRun[54] <> "" Then ShellExecute($rRun[54])
+		Case $rExecutable[55]
+			If $rRun[55] <> "" Then ShellExecute($rRun[55])
+		Case $rExecutable[56]
+			If $rRun[56] <> "" Then ShellExecute($rRun[56])
+		Case $rExecutable[57]
+			If $rRun[57] <> "" Then ShellExecute($rRun[57])
+		Case $rExecutable[58]
+			If $rRun[58] <> "" Then ShellExecute($rRun[58])
+		Case $rExecutable[59]
+			If $rRun[59] <> "" Then ShellExecute($rRun[59])
+		Case $rExecutable[60]
+			If $rRun[60] <> "" Then ShellExecute($rRun[60])
+		Case $rExecutable[61]
+			If $rRun[61] <> "" Then ShellExecute($rRun[61])
+		Case $rExecutable[62]
+			If $rRun[62] <> "" Then ShellExecute($rRun[62])
+		Case $rExecutable[63]
+			If $rRun[63] <> "" Then ShellExecute($rRun[63])
+		Case $rExecutable[64]
+			If $rRun[64] <> "" Then ShellExecute($rRun[64])
+		Case $rExecutable[65]
+			If $rRun[65] <> "" Then ShellExecute($rRun[65])
+		Case $rExecutable[66]
+			If $rRun[66] <> "" Then ShellExecute($rRun[66])
+		Case $rExecutable[67]
+			If $rRun[67] <> "" Then ShellExecute($rRun[67])
+		Case $rExecutable[68]
+			If $rRun[68] <> "" Then ShellExecute($rRun[68])
+		Case $rExecutable[69]
+			If $rRun[69] <> "" Then ShellExecute($rRun[69])
+		Case $rExecutable[70]
+			If $rRun[70] <> "" Then ShellExecute($rRun[70])
+		Case $rExecutable[71]
+			If $rRun[71] <> "" Then ShellExecute($rRun[71])
+		Case $rExecutable[72]
+			If $rRun[72] <> "" Then ShellExecute($rRun[72])
+		Case $rExecutable[73]
+			If $rRun[73] <> "" Then ShellExecute($rRun[73])
+		Case $rExecutable[74]
+			If $rRun[74] <> "" Then ShellExecute($rRun[74])
+		Case $rExecutable[75]
+			If $rRun[75] <> "" Then ShellExecute($rRun[75])
+		Case $rExecutable[76]
+			If $rRun[76] <> "" Then ShellExecute($rRun[76])
+		Case $rExecutable[77]
+			If $rRun[77] <> "" Then ShellExecute($rRun[77])
+		Case $rExecutable[78]
+			If $rRun[78] <> "" Then ShellExecute($rRun[78])
+		Case $rExecutable[79]
+			If $rRun[79] <> "" Then ShellExecute($rRun[79])
+		Case $rExecutable[80]
+			If $rRun[80] <> "" Then ShellExecute($rRun[80])
+		Case $rExecutable[81]
+			If $rRun[81] <> "" Then ShellExecute($rRun[81])
+		Case $rExecutable[82]
+			If $rRun[82] <> "" Then ShellExecute($rRun[82])
+		Case $rExecutable[83]
+			If $rRun[83] <> "" Then ShellExecute($rRun[83])
+		Case $rExecutable[84]
+			If $rRun[84] <> "" Then ShellExecute($rRun[84])
+		Case $rExecutable[85]
+			If $rRun[85] <> "" Then ShellExecute($rRun[85])
+		Case $rExecutable[86]
+			If $rRun[86] <> "" Then ShellExecute($rRun[86])
+		Case $rExecutable[87]
+			If $rRun[87] <> "" Then ShellExecute($rRun[87])
+		Case $rExecutable[88]
+			If $rRun[88] <> "" Then ShellExecute($rRun[88])
+		Case $rExecutable[89]
+			If $rRun[89] <> "" Then ShellExecute($rRun[89])
+		Case $rExecutable[90]
+			If $rRun[90] <> "" Then ShellExecute($rRun[90])
+		Case $rExecutable[91]
+			If $rRun[91] <> "" Then ShellExecute($rRun[91])
+		Case $rExecutable[92]
+			If $rRun[92] <> "" Then ShellExecute($rRun[92])
+		Case $rExecutable[93]
+			If $rRun[93] <> "" Then ShellExecute($rRun[93])
+		Case $rExecutable[94]
+			If $rRun[94] <> "" Then ShellExecute($rRun[94])
+		Case $rExecutable[95]
+			If $rRun[95] <> "" Then ShellExecute($rRun[95])
+		Case $rExecutable[96]
+			If $rRun[96] <> "" Then ShellExecute($rRun[96])
+		Case $rExecutable[97]
+			If $rRun[97] <> "" Then ShellExecute($rRun[97])
+		Case $rExecutable[98]
+			If $rRun[98] <> "" Then ShellExecute($rRun[98])
+		Case $rExecutable[99]
+			If $rRun[99] <> "" Then ShellExecute($rRun[99])
+		Case $rExecutable[100]
+			If $rRun[100] <> "" Then ShellExecute($rRun[100])
+		Case $rExecutable[101]
+			If $rRun[101] <> "" Then ShellExecute($rRun[101])
+		Case $rExecutable[102]
+			If $rRun[102] <> "" Then ShellExecute($rRun[102])
+		Case $rExecutable[103]
+			If $rRun[103] <> "" Then ShellExecute($rRun[103])
+		Case $rExecutable[104]
+			If $rRun[104] <> "" Then ShellExecute($rRun[104])
+		Case $rExecutable[105]
+			If $rRun[105] <> "" Then ShellExecute($rRun[105])
+		Case $rExecutable[106]
+			If $rRun[106] <> "" Then ShellExecute($rRun[106])
+		Case $rExecutable[107]
+			If $rRun[107] <> "" Then ShellExecute($rRun[107])
+		Case $rExecutable[108]
+			If $rRun[108] <> "" Then ShellExecute($rRun[108])
+		Case $rExecutable[109]
+			If $rRun[109] <> "" Then ShellExecute($rRun[109])
+		Case $rExecutable[110]
+			If $rRun[110] <> "" Then ShellExecute($rRun[110])
+		Case $rExecutable[111]
+			If $rRun[111] <> "" Then ShellExecute($rRun[111])
+		Case $rExecutable[112]
+			If $rRun[112] <> "" Then ShellExecute($rRun[112])
+		Case $rExecutable[113]
+			If $rRun[113] <> "" Then ShellExecute($rRun[113])
+		Case $rExecutable[114]
+			If $rRun[114] <> "" Then ShellExecute($rRun[114])
+		Case $rExecutable[115]
+			If $rRun[115] <> "" Then ShellExecute($rRun[115])
+		Case $rExecutable[116]
+			If $rRun[116] <> "" Then ShellExecute($rRun[116])
+		Case $rExecutable[117]
+			If $rRun[117] <> "" Then ShellExecute($rRun[117])
+		Case $rExecutable[118]
+			If $rRun[118] <> "" Then ShellExecute($rRun[118])
+		Case $rExecutable[119]
+			If $rRun[119] <> "" Then ShellExecute($rRun[119])
+		Case $rExecutable[120]
+			If $rRun[120] <> "" Then ShellExecute($rRun[120])
+		Case $rExecutable[121]
+			If $rRun[121] <> "" Then ShellExecute($rRun[121])
+		Case $rExecutable[122]
+			If $rRun[122] <> "" Then ShellExecute($rRun[122])
+		Case $rExecutable[123]
+			If $rRun[123] <> "" Then ShellExecute($rRun[123])
+		Case $rExecutable[124]
+			If $rRun[124] <> "" Then ShellExecute($rRun[124])
+		Case $rExecutable[125]
+			If $rRun[125] <> "" Then ShellExecute($rRun[125])
+		Case $rExecutable[126]
+			If $rRun[126] <> "" Then ShellExecute($rRun[126])
+		Case $rExecutable[127]
+			If $rRun[127] <> "" Then ShellExecute($rRun[127])
+		Case $rExecutable[128]
+			If $rRun[128] <> "" Then ShellExecute($rRun[128])
+		Case $rExecutable[129]
+			If $rRun[129] <> "" Then ShellExecute($rRun[129])
+		Case $rExecutable[130]
+			If $rRun[130] <> "" Then ShellExecute($rRun[130])
+		Case $rExecutable[131]
+			If $rRun[131] <> "" Then ShellExecute($rRun[131])
+		Case $rExecutable[132]
+			If $rRun[132] <> "" Then ShellExecute($rRun[132])
+		Case $rExecutable[133]
+			If $rRun[133] <> "" Then ShellExecute($rRun[133])
+		Case $rExecutable[134]
+			If $rRun[134] <> "" Then ShellExecute($rRun[134])
+		Case $rExecutable[135]
+			If $rRun[135] <> "" Then ShellExecute($rRun[135])
+		Case $rExecutable[136]
+			If $rRun[136] <> "" Then ShellExecute($rRun[136])
+		Case $rExecutable[137]
+			If $rRun[137] <> "" Then ShellExecute($rRun[137])
+		Case $rExecutable[138]
+			If $rRun[138] <> "" Then ShellExecute($rRun[138])
+		Case $rExecutable[139]
+			If $rRun[139] <> "" Then ShellExecute($rRun[139])
+		Case $rExecutable[140]
+			If $rRun[140] <> "" Then ShellExecute($rRun[140])
+		Case $rExecutable[141]
+			If $rRun[141] <> "" Then ShellExecute($rRun[141])
+		Case $rExecutable[142]
+			If $rRun[142] <> "" Then ShellExecute($rRun[142])
+		Case $rExecutable[143]
+			If $rRun[143] <> "" Then ShellExecute($rRun[143])
+		Case $rExecutable[144]
+			If $rRun[144] <> "" Then ShellExecute($rRun[144])
+		Case $rExecutable[145]
+			If $rRun[145] <> "" Then ShellExecute($rRun[145])
+		Case $rExecutable[146]
+			If $rRun[146] <> "" Then ShellExecute($rRun[146])
+		Case $rExecutable[147]
+			If $rRun[147] <> "" Then ShellExecute($rRun[147])
+		Case $rExecutable[148]
+			If $rRun[148] <> "" Then ShellExecute($rRun[148])
+		Case $rExecutable[149]
+			If $rRun[149] <> "" Then ShellExecute($rRun[149])
+		Case $rExecutable[150]
+			If $rRun[150] <> "" Then ShellExecute($rRun[150])
+		Case $rExecutable[151]
+			If $rRun[151] <> "" Then ShellExecute($rRun[151])
+		Case $rExecutable[152]
+			If $rRun[152] <> "" Then ShellExecute($rRun[152])
+		Case $rExecutable[153]
+			If $rRun[153] <> "" Then ShellExecute($rRun[153])
+		Case $rExecutable[154]
+			If $rRun[154] <> "" Then ShellExecute($rRun[154])
+		Case $rExecutable[155]
+			If $rRun[155] <> "" Then ShellExecute($rRun[155])
+		Case $rExecutable[156]
+			If $rRun[156] <> "" Then ShellExecute($rRun[156])
+		Case $rExecutable[157]
+			If $rRun[157] <> "" Then ShellExecute($rRun[157])
+		Case $rExecutable[158]
+			If $rRun[158] <> "" Then ShellExecute($rRun[158])
+		Case $rExecutable[159]
+			If $rRun[159] <> "" Then ShellExecute($rRun[159])
+		Case $rExecutable[160]
+			If $rRun[160] <> "" Then ShellExecute($rRun[160])
+		Case $rExecutable[161]
+			If $rRun[161] <> "" Then ShellExecute($rRun[161])
+		Case $rExecutable[162]
+			If $rRun[162] <> "" Then ShellExecute($rRun[162])
+		Case $rExecutable[163]
+			If $rRun[163] <> "" Then ShellExecute($rRun[163])
+		Case $rExecutable[164]
+			If $rRun[164] <> "" Then ShellExecute($rRun[164])
+		Case $rExecutable[165]
+			If $rRun[165] <> "" Then ShellExecute($rRun[165])
+		Case $rExecutable[166]
+			If $rRun[166] <> "" Then ShellExecute($rRun[166])
+		Case $rExecutable[167]
+			If $rRun[167] <> "" Then ShellExecute($rRun[167])
+		Case $rExecutable[168]
+			If $rRun[168] <> "" Then ShellExecute($rRun[168])
+		Case $rExecutable[169]
+			If $rRun[169] <> "" Then ShellExecute($rRun[169])
+		Case $rExecutable[170]
+			If $rRun[170] <> "" Then ShellExecute($rRun[170])
+		Case $rExecutable[171]
+			If $rRun[171] <> "" Then ShellExecute($rRun[171])
+		Case $rExecutable[172]
+			If $rRun[172] <> "" Then ShellExecute($rRun[172])
+		Case $rExecutable[173]
+			If $rRun[173] <> "" Then ShellExecute($rRun[173])
+		Case $rExecutable[174]
+			If $rRun[174] <> "" Then ShellExecute($rRun[174])
+		Case $rExecutable[175]
+			If $rRun[175] <> "" Then ShellExecute($rRun[175])
+		Case $rExecutable[176]
+			If $rRun[176] <> "" Then ShellExecute($rRun[176])
+		Case $rExecutable[177]
+			If $rRun[177] <> "" Then ShellExecute($rRun[177])
+		Case $rExecutable[178]
+			If $rRun[178] <> "" Then ShellExecute($rRun[178])
+		Case $rExecutable[179]
+			If $rRun[179] <> "" Then ShellExecute($rRun[179])
+		Case $rExecutable[180]
+			If $rRun[180] <> "" Then ShellExecute($rRun[180])
+		Case $rExecutable[181]
+			If $rRun[181] <> "" Then ShellExecute($rRun[181])
+		Case $rExecutable[182]
+			If $rRun[182] <> "" Then ShellExecute($rRun[182])
+		Case $rExecutable[183]
+			If $rRun[183] <> "" Then ShellExecute($rRun[183])
+		Case $rExecutable[184]
+			If $rRun[184] <> "" Then ShellExecute($rRun[184])
+		Case $rExecutable[185]
+			If $rRun[185] <> "" Then ShellExecute($rRun[185])
+		Case $rExecutable[186]
+			If $rRun[186] <> "" Then ShellExecute($rRun[186])
+		Case $rExecutable[187]
+			If $rRun[187] <> "" Then ShellExecute($rRun[187])
+		Case $rExecutable[188]
+			If $rRun[188] <> "" Then ShellExecute($rRun[188])
+		Case $rExecutable[189]
+			If $rRun[189] <> "" Then ShellExecute($rRun[189])
+		Case $rExecutable[190]
+			If $rRun[190] <> "" Then ShellExecute($rRun[190])
+		Case $rExecutable[191]
+			If $rRun[191] <> "" Then ShellExecute($rRun[191])
+		Case $rExecutable[192]
+			If $rRun[192] <> "" Then ShellExecute($rRun[192])
+		Case $rExecutable[193]
+			If $rRun[193] <> "" Then ShellExecute($rRun[193])
+		Case $rExecutable[194]
+			If $rRun[194] <> "" Then ShellExecute($rRun[194])
+		Case $rExecutable[195]
+			If $rRun[195] <> "" Then ShellExecute($rRun[195])
+		Case $rExecutable[196]
+			If $rRun[196] <> "" Then ShellExecute($rRun[196])
+		Case $rExecutable[197]
+			If $rRun[197] <> "" Then ShellExecute($rRun[197])
+		Case $rExecutable[198]
+			If $rRun[198] <> "" Then ShellExecute($rRun[198])
+		Case $rExecutable[199]
+			If $rRun[199] <> "" Then ShellExecute($rRun[199])
+		Case $rExecutable[200]
+			If $rRun[200] <> "" Then ShellExecute($rRun[200])
+		Case $rExecutable[201]
+			If $rRun[201] <> "" Then ShellExecute($rRun[201])
+		Case $rExecutable[202]
+			If $rRun[202] <> "" Then ShellExecute($rRun[202])
+		Case $rExecutable[203]
+			If $rRun[203] <> "" Then ShellExecute($rRun[203])
+		Case $rExecutable[204]
+			If $rRun[204] <> "" Then ShellExecute($rRun[204])
+		Case $rExecutable[205]
+			If $rRun[205] <> "" Then ShellExecute($rRun[205])
+		Case $rExecutable[206]
+			If $rRun[206] <> "" Then ShellExecute($rRun[206])
+		Case $rExecutable[207]
+			If $rRun[207] <> "" Then ShellExecute($rRun[207])
+		Case $rExecutable[208]
+			If $rRun[208] <> "" Then ShellExecute($rRun[208])
+		Case $rExecutable[209]
+			If $rRun[209] <> "" Then ShellExecute($rRun[209])
+		Case $rExecutable[210]
+			If $rRun[210] <> "" Then ShellExecute($rRun[210])
+		Case $rExecutable[211]
+			If $rRun[211] <> "" Then ShellExecute($rRun[211])
+		Case $rExecutable[212]
+			If $rRun[212] <> "" Then ShellExecute($rRun[212])
+		Case $rExecutable[213]
+			If $rRun[213] <> "" Then ShellExecute($rRun[213])
+		Case $rExecutable[214]
+			If $rRun[214] <> "" Then ShellExecute($rRun[214])
+		Case $rExecutable[215]
+			If $rRun[215] <> "" Then ShellExecute($rRun[215])
+		Case $rExecutable[216]
+			If $rRun[216] <> "" Then ShellExecute($rRun[216])
+		Case $rExecutable[217]
+			If $rRun[217] <> "" Then ShellExecute($rRun[217])
+		Case $rExecutable[218]
+			If $rRun[218] <> "" Then ShellExecute($rRun[218])
+		Case $rExecutable[219]
+			If $rRun[219] <> "" Then ShellExecute($rRun[219])
+		Case $rExecutable[220]
+			If $rRun[220] <> "" Then ShellExecute($rRun[220])
+		Case $rExecutable[221]
+			If $rRun[221] <> "" Then ShellExecute($rRun[221])
+		Case $rExecutable[222]
+			If $rRun[222] <> "" Then ShellExecute($rRun[222])
+		Case $rExecutable[223]
+			If $rRun[223] <> "" Then ShellExecute($rRun[223])
+		Case $rExecutable[224]
+			If $rRun[224] <> "" Then ShellExecute($rRun[224])
+		Case $rExecutable[225]
+			If $rRun[225] <> "" Then ShellExecute($rRun[225])
+		Case $rExecutable[226]
+			If $rRun[226] <> "" Then ShellExecute($rRun[226])
+		Case $rExecutable[227]
+			If $rRun[227] <> "" Then ShellExecute($rRun[227])
+		Case $rExecutable[228]
+			If $rRun[228] <> "" Then ShellExecute($rRun[228])
+		Case $rExecutable[229]
+			If $rRun[229] <> "" Then ShellExecute($rRun[229])
+		Case $rExecutable[230]
+			If $rRun[230] <> "" Then ShellExecute($rRun[230])
+		Case $rExecutable[231]
+			If $rRun[231] <> "" Then ShellExecute($rRun[231])
+		Case $rExecutable[232]
+			If $rRun[232] <> "" Then ShellExecute($rRun[232])
+		Case $rExecutable[233]
+			If $rRun[233] <> "" Then ShellExecute($rRun[233])
+		Case $rExecutable[234]
+			If $rRun[234] <> "" Then ShellExecute($rRun[234])
+		Case $rExecutable[235]
+			If $rRun[235] <> "" Then ShellExecute($rRun[235])
+		Case $rExecutable[236]
+			If $rRun[236] <> "" Then ShellExecute($rRun[236])
+		Case $rExecutable[237]
+			If $rRun[237] <> "" Then ShellExecute($rRun[237])
+		Case $rExecutable[238]
+			If $rRun[238] <> "" Then ShellExecute($rRun[238])
+		Case $rExecutable[239]
+			If $rRun[239] <> "" Then ShellExecute($rRun[239])
+		Case $rExecutable[240]
+			If $rRun[240] <> "" Then ShellExecute($rRun[240])
+		Case $rExecutable[241]
+			If $rRun[241] <> "" Then ShellExecute($rRun[241])
+		Case $rExecutable[242]
+			If $rRun[242] <> "" Then ShellExecute($rRun[242])
+		Case $rExecutable[243]
+			If $rRun[243] <> "" Then ShellExecute($rRun[243])
+		Case $rExecutable[244]
+			If $rRun[244] <> "" Then ShellExecute($rRun[244])
+		Case $rExecutable[245]
+			If $rRun[245] <> "" Then ShellExecute($rRun[245])
+		Case $rExecutable[246]
+			If $rRun[246] <> "" Then ShellExecute($rRun[246])
+		Case $rExecutable[247]
+			If $rRun[247] <> "" Then ShellExecute($rRun[247])
+		Case $rExecutable[248]
+			If $rRun[248] <> "" Then ShellExecute($rRun[248])
+		Case $rExecutable[249]
+			If $rRun[249] <> "" Then ShellExecute($rRun[249])
+		Case $rExecutable[250]
+			If $rRun[250] <> "" Then ShellExecute($rRun[250])
+		Case $rExecutable[251]
+			If $rRun[251] <> "" Then ShellExecute($rRun[251])
+		Case $rExecutable[252]
+			If $rRun[252] <> "" Then ShellExecute($rRun[252])
+		Case $rExecutable[253]
+			If $rRun[253] <> "" Then ShellExecute($rRun[253])
+		Case $rExecutable[254]
+			If $rRun[254] <> "" Then ShellExecute($rRun[254])
+		Case $rExecutable[255]
+			If $rRun[255] <> "" Then ShellExecute($rRun[255])
 	EndSwitch
 WEnd
