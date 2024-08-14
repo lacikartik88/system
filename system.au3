@@ -71,7 +71,7 @@ Func Init()
 
 	; define main gui vars
 	Global $mainGUI, $icon, $back, $iExit, $iCAT, $iCP, $iS, $iPS, $iCMD, $iAdd, $iRem, $bExit, $bCAT, $bCP, $bS, $bPS, $bCMD, $bAdd, $bRem ; theme variables
-	Global $rCategory[16], $rName[256], $rExecutable[256], $rRun[256], $ext = "*.exe; *.cmd"  ; create menu system
+	Global $rCategory[16], $rName[256], $rExecutable[256], $rRun[256], $ext = "*.exe; *.cmd; *.html"  ; create menu system
 	Global $i = 0, $j = 0, $k = 0, $l = 0, $m = 0, $n = 0, $p = 0, $q = 0; sequence variables
 	Global $aCategory[16] = ["BOOT", "DEV", "EDUCATION", "FILE_MANAGE", "MEDIA_AUDIO", "MEDIA_PICTURE", "MEDIA_VIDEO", "NETWORK", "OFFICE", "SECURITY", "UTILITY"] ; for category folder creation
 	Global $aInfo, $aInfoDAT[32], $aInfoDB[32] = ["Host Name", "OS Name", "OS Version", "OS Manufacturer", "OS Configuration", "OS Build Type", "System Boot Time", _
