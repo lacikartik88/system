@@ -1,5 +1,5 @@
-# SYSTEM
-Portable Software Launcher System with Infotool and Admintools options
+# SYSTEM v2.4.08.11 Ultimate Edition   (developer: Kártik László - Senior IT System Engineer)
+Categorized Portable Software Launcher System with Information tool and Administrative tool options
 
 # Deafult directory structure
 0=BOOT
