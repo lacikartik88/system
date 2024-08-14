@@ -8,9 +8,9 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=System control panel and tools for system engineers, created by AutoIt3
 #AutoIt3Wrapper_Res_Description=SYSTEM   v2.4.07.30   Ultimate Edition
-#AutoIt3Wrapper_Res_Fileversion=2.4.7.30
+#AutoIt3Wrapper_Res_Fileversion=2.4.8.11
 #AutoIt3Wrapper_Res_ProductName=SYSTEM
-#AutoIt3Wrapper_Res_ProductVersion=2.4.07.30
+#AutoIt3Wrapper_Res_ProductVersion=2.4.08.11
 #AutoIt3Wrapper_Res_CompanyName=László Kártik - Senior IT System Engineer
 #AutoIt3Wrapper_Res_LegalCopyright=Copyright © 2024, László Kártik
 #AutoIt3Wrapper_Res_LegalTradeMarks=SYSTEM ™ SINCE 2019
@@ -71,7 +71,7 @@ Func Init()
 
 	; define main gui vars
 	Global $mainGUI, $icon, $back, $iExit, $iCAT, $iCP, $iS, $iPS, $iCMD, $iAdd, $iRem, $bExit, $bCAT, $bCP, $bS, $bPS, $bCMD, $bAdd, $bRem ; theme variables
-	Global $rCategory[16], $rName[256], $rExecutable[256], $rRun[256] ; create menu system
+	Global $rCategory[16], $rName[256], $rExecutable[256], $rRun[256], $ext = "*.exe; *.cmd"  ; create menu system
 	Global $i = 0, $j = 0, $k = 0, $l = 0, $m = 0, $n = 0, $p = 0, $q = 0; sequence variables
 	Global $aCategory[16] = ["BOOT", "DEV", "EDUCATION", "FILE_MANAGE", "MEDIA_AUDIO", "MEDIA_PICTURE", "MEDIA_VIDEO", "NETWORK", "OFFICE", "SECURITY", "UTILITY"] ; for category folder creation
 	Global $aInfo, $aInfoDAT[32], $aInfoDB[32] = ["Host Name", "OS Name", "OS Version", "OS Manufacturer", "OS Configuration", "OS Build Type", "System Boot Time", _
@@ -104,7 +104,7 @@ Func Init()
 	; define head
 	Global $sysName, $n, $v, $e
 	$n = "SYSTEM"
-	$v = "v2.4.07.30"
+	$v = "v2.4.08.11"
 	$e = "Ultimate Edition   (developer: Kártik László - Senior IT System Engineer)"
 	$sysName = $n & "    " & $v & "    " & $e
 	BinaryToString(IniWrite($cfg, $n, "Name", $n), $SB_ANSI)
@@ -181,7 +181,7 @@ Func GenData()
 				For $k In $rName
 					If IsString($k) Then
 						; IniWrite($cfg, $i, $l, $k)
-						$rExecutable = _FileListToArray($appD & "\" & $i & "\" & $k, "*.exe", $FLTA_FILES, False)
+						$rExecutable = _FileListToArrayRec($appD & "\" & $i & "\" & $k, $ext, $FLTAR_FILES, $FLTAR_NORECUR, $FLTAR_SORT, $FLTAR_NOPATH)
 						$l += 1
 						If IsArray($rExecutable) Then
 							For $m In $rExecutable
@@ -442,7 +442,7 @@ Func VideoDisplay()
 		.EnableContextMenu = False
 		.Enabled = True
 		.UIMode = "none" ; full / none / mini full
-		.Eettings.AutoStart = True
+		.Settings.AutoStart = True
 		.Settings.Mute = True ;
 		.Settings.Volume = 0 ; 0 - 100
 		.Settings.Balance = 0 ; -100 to 100
